@@ -13,13 +13,13 @@ import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
 message StreamSelectedFromSequenceRequest {
    /// 
    message SelectedStream {
-      /// The stream identifier.
+      /// The destired data stream's identifier.
       StreamIdentifier identifier = 1;
       /// The stream's starting sequence number.
       uint64 sequence_number = 2;
    }
    /// A request identifier.
    string identifier = 1 [default = ""];
-   /// The desired streams.
+   /// The selected streams.
    repeated SelectedStreams selected_streams = 2;
 }
