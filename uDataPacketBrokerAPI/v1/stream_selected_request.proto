@@ -12,6 +12,6 @@ import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
 message StreamSelectedRequest {
    /// A request identifier.
    string identifier = 1 [default = ""];
-   /// The desired streams.
-   repeated stream_identifier selected_streams = 2;
+   /// The desired data streams.
+   repeated StreamIdentifier selected_streams = 2;
 }
