@@ -81,6 +81,8 @@ set(LIBRARY_HEADER_FILES
 set(PROTO_SRC
     uDataPacketBrokerAPI/v1/data_type.proto 
     uDataPacketBrokerAPI/v1/packet.proto
+    uDataPacketBrokerAPI/v1/available_streams_request.proto
+    uDataPacketBrokerAPI/v1/available_streams_response.proto
     uDataPacketBrokerAPI/v1/publish_response.proto
     uDataPacketBrokerAPI/v1/publish_service.proto
     uDataPacketBrokerAPI/v1/stream_identifier.proto
