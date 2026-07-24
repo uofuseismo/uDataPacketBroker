@@ -2,13 +2,13 @@ edition = "2023";
 
 package UDataPacketBrokerAPI.V1;
 
-import "uDataPacketBroker/v1/packet.proto";
-import "uDataPacketBroker/v1/available_streams_request.proto";
-import "uDataPacketBroker/v1/available_streams_response.proto";
-import "uDataPacketBroker/v1/stream_all_request.proto";
-import "uDataPacketBroker/v1/stream_selected_request.proto";
-import "uDataPacketBroker/v1/stream_all_from_sequence_request.proto";
-import "uDataPacketBroker/v1/stream_selected_from_sequence_request.proto";
+import "uDataPacketBrokerAPI/v1/packet.proto";
+import "uDataPacketBrokerAPI/v1/available_streams_request.proto";
+import "uDataPacketBrokerAPI/v1/available_streams_response.proto";
+import "uDataPacketBrokerAPI/v1/stream_all_request.proto";
+import "uDataPacketBrokerAPI/v1/stream_selected_request.proto";
+import "uDataPacketBrokerAPI/v1/stream_all_from_sequence_request.proto";
+import "uDataPacketBrokerAPI/v1/stream_selected_from_sequence_request.proto";
 
 /**
  * Applications looking for streaming data subscribe to one of these end points.
