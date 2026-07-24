@@ -15,7 +15,8 @@ message PublishResponse {
    message LastPacketIdentifier {
       /// The stream identifier.
       StreamIdentifier stream_identifier = 1;
-      /// The packet's sequence number (as dictated by the publisher).
+      /// The packet's sequence number (as dictated by the publisher).  This 
+      /// corresponds to the last packet the service has received from the client.
       uint64 sequence_number = 2;
    }
    /// Identifying information for the last packet received from each stream.
