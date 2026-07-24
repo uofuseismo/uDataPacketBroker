@@ -21,5 +21,5 @@ message StreamSelectedFromSequenceRequest {
    /// A request identifier.
    string identifier = 1 [default = ""];
    /// The selected streams.
-   repeated SelectedStreams selected_streams = 2;
+   repeated SelectedStream selected_streams = 2;
 }
