@@ -1,0 +1,17 @@
+edition = "2023";
+
+package UDataPacketBroker.V1;
+
+/**
+ * Requests packets from all streams beginning with (and including) the given sequence
+ * number.  Note, this is best effort and it is possible that the packet with the
+ * specified sequence number has been deleted.  Additionally, after backfill has
+ * completed this behaves like StreamAll whereby the client will automatically receive
+ * newly acquired streams.
+ */
+message StreamAllFromSequenceRequest {
+   /// A request identifier.
+   string identifier = 1 [default = ""];
+   /// The sequence number at which to commence the subscription.
+   uint64 sequence_number = 2;
+}

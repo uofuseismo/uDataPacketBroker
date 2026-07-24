@@ -1,0 +1,17 @@
+edition = "2023";
+
+package UDataPacketBroker.V1;
+import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
+
+/**
+ * Requests newly acquired packets from the desired streams.  If you expect a 
+ * stream to become available in the future then you may request it and, when
+ * the stream becomes available the client's subscription will automatically be
+ * updated.
+ */
+message StreamSelectedRequest {
+   /// A request identifier.
+   string identifier = 1 [default = ""];
+   /// The desired streams.
+   repeated stream_identifier selected_streams = 2;
+}
