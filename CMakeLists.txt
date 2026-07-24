@@ -73,8 +73,10 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
                ${CMAKE_SOURCE_DIR}/include/${PROJECT_NAME}/version.hpp)
 
 set(LIBRARY_SRC
+    src/utilities.cpp
     src/version.cpp)
 set(LIBRARY_HEADER_FILES
+    include/${PROJECT_NAME}/utilities.hpp
     include/${PROJECT_NAME}/version.hpp)
 set(PROTO_SRC
     uDataPacketBrokerAPI/v1/data_type.proto 
