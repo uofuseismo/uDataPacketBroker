@@ -1,0 +1,30 @@
+edition = "2023";
+
+package UDataPacketBrokerAPI.V1;
+
+import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
+
+/**
+ * Summary information for publisher clients. 
+ */
+message PublishResponse {
+   /// Some very simple information on the last packet received from a given stream.
+   /// This allows a client interacting with a shutting down broker to connect to a
+   /// replacement broker and send (cached) data at an appropriate time to reduce
+   /// data gaps.
+   message LastPacketIdentifier {
+      /// The stream identifier.
+      StreamIdentifier stream_identifier = 1;
+      /// The packet's sequence number (as dictated by the publisher).
+      uint64 sequence_number = 2;
+   }
+   /// Identifying information for the last packet received from each stream.
+   repeated LastPacketIdentifier last_packet_identifiers = 1;
+   /// The number of packets the client has submitted to the middleware.
+   uint64 n_packets_received = 2;
+   /// The number of invalid packets submitted to the middleware.
+   uint64 n_invalid_packets_received = 3;
+   /// Any additional information the clients should know on shutdown.  For example, this 
+   /// could warn that this API is going to be deprecated, etc.
+   string messages = 4 [default = ""];
+}

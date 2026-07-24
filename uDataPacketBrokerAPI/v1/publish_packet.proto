@@ -1,0 +1,29 @@
+edition = "2023";
+import "google/protobuf/timestamp.proto";
+
+package UDataPacketBrokerAPI.V1;
+
+import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
+import "uDataPacketBrokerAPI/v1/data_type.proto";
+
+/**
+ * Defines a data packet to submit to the publisher.  This amounts to a 
+ * stream identifier, a start time, sampling rate, and data. 
+ */
+message PublishPacket {
+   /// The stream identifier that submitted this packet.
+   StreamIdentifier stream_identifier = 1;
+   /// The time of the first sample in the data packet (UTC).
+   google.protobuf.Timestamp start_time = 2;
+   /// The sampling rate in Hz.
+   double sampling_rate = 3;
+   /// The data type.
+   DataType data_type = 4;
+   /// The number of samples.
+   uint32 number_of_samples = 5;
+   /// The actual samples.  This is always stored in little endian.
+   bytes data = 6;
+   /// Allows publishers to tag outbound packets so as to appropriately resume
+   /// publication streams with (new) brokers.
+   uint64 sequence_number = 7;
+}

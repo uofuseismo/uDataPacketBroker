@@ -1,0 +1,21 @@
+edition = "2023";
+
+package UDataPacketBrokerAPI.V1;
+
+/**
+ * Defines the underlying data type when interpreting data.
+ */
+enum DataType {
+    /// The data type is unknown. 
+    DATA_TYPE_UNKNOWN = 0;
+    /// The data is a sequence of 32-bit integers (this is the most common choice).
+    DATA_TYPE_INTEGER_32 = 1;
+    /// The data is a sequence of 32-bit floats.
+    DATA_TYPE_FLOAT = 2;
+    /// The data is a sequence a 64-bit float (double precision).
+    DATA_TYPE_DOUBLE = 3;
+    /// The data is a sequence of characters (should not happen with seismic data).
+    DATA_TYPE_TEXT = 4;
+    /// The data is a sequence of 64-bit integers.
+    DATA_TYPE_INTEGER_64 = 5;
+}

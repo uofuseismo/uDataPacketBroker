@@ -1,0 +1,17 @@
+edition = "2023";
+
+package uDataPacketBrokerAPI.V1;
+
+/**
+ * Identifies a stream by its network, station, channel, and location code.
+ */
+message StreamIdentifier {
+   /// A network identifier - e.g., UU.
+   string network = 1;
+   /// A station identifier - e.g., SRU.
+   string station = 2;
+   /// A channel identifier - e.g., HHZ.
+   string channel = 3;
+   /// A location code - e.g., 01.  Note, if this is not set then use "--".
+   string location_code = 4 [default = "--"];
+}
