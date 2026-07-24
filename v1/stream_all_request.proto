@@ -1,0 +1,13 @@
+edition = "2023";
+import "google/protobuf/timestamp.proto";
+
+package UDataPacketBrokerAPI.V1;
+
+/**
+ * Requests data from every data stream.  Any newly acquired data streams will automatically
+ * be populated in this feed.
+ */
+message StreamAllRequest {
+   /// A request identifier.
+   string identifier = 1 [default = ""];
+}

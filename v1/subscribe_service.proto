@@ -1,0 +1,34 @@
+edition = "2023";
+
+package UDataPacketBrokerAPI.V1;
+
+import "uDataPacketBroker/v1/packet.proto";
+import "uDataPacketBroker/v1/stream_all_request.proto";
+import "uDataPacketBroker/v1/stream_selected_request.proto";
+import "uDataPacketBroker/v1/stream_all_from_sequence_request.proto";
+import "uDataPacketBroker/v1/stream_selected_from_sequence_request.proto";
+
+/**
+ * Applications looking for streaming data subscribe to one of these end points.
+ * Note, during startup when a backfill is occurring, there is no guarantee that
+ * newly acquired data will not be interspersed with backfilling data.
+ */
+service SubscribeService {
+    /// Streams the lastest packets from all data streams.  This subscribes to every available 
+    /// data stream.  Each data stream subscription commences with the last packet received.
+    rpc StreamAll(StreamAllRequest) returns(stream Packet) {};
+    
+    /// Streams the latest packets from selected data streams.  Each data stream subscription
+    /// commences with the last packet received by the broker.  
+    rpc StreamSelected(StreamSelectedRequest) returns(stream Packet) {};    
+    
+    /// (Re)commences streaming from all data streams based on a global sequence number. 
+    /// After backfill has occurred this behaves like a StreamAll request
+    /// where only real-time data is received.
+    rpc StreamAllFromSequence(StreamAllFromSequenceRequest) returns(stream Packet) {}; 
+
+    /// (Re)commences streaming from selected data streams based on the sequence 
+    /// numbers.  After backfill has occurred this behaves like a StreamSelected request
+    /// where only real-time data is received.
+    rpc StreamSelectedFromSequence(StreamSelectedFromSequenceRequest) returns(stream Packet) {}; 
+}
