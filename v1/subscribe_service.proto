@@ -29,7 +29,7 @@ service SubscribeService {
     /// where only real-time data is received.  Backfill is best effort and
     /// will begin at the given sequence number - i.e., no packets with lesser
     /// sequence numbers will be returned.
-    //rpc StreamAllFromSequence(StreamAllFromSequenceRequest) returns(stream Packet) {}; 
+    rpc StreamAllFromSequence(StreamAllFromSequenceRequest) returns(stream Packet) {}; 
 
     /// (Re)commences streaming from selected data streams based on the sequence 
     /// numbers.  After backfill has occurred this behaves like a StreamSelected request

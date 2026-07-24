@@ -1,6 +1,6 @@
 edition = "2023";
 
-package UDataPacketBroker.V1;
+package UDataPacketBrokerAPI.V1;
 
 /**
  * Requests packets from all streams beginning with (and including) the given sequence
