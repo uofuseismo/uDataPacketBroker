@@ -1,0 +1,24 @@
+edition = "2023";
+import "google/protobuf/timestamp.proto";
+
+package UDataPacketBrokerAPI.V1;
+
+import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
+
+/**
+ * The streams available at the moment.
+ */
+message AvailableStreamsResponse {
+   /// Defines an available stream as a stream identifier and when data was
+   /// last received.
+   message AvailableStream {
+      /// The stream identifier.
+      StreamIdentifier identifier = 1;
+      /// Time in UTC that the last packet was received (not the packet start time).
+      google.protobuf.Timestamp last_received = 2;
+   };
+   /// The identifier matching the input request.
+   string identifier = 1 [default = ""];
+   /// The available streams.
+   repeated AvailableStream available_streams = 2;
+}
