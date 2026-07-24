@@ -1,6 +1,6 @@
 edition = "2023";
 
-package UDataPacketBroker.V1;
+package UDataPacketBrokerAPI.V1;
 import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
 
 /**
