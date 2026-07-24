@@ -1,0 +1,25 @@
+edition = "2023";
+
+package UDataPacketBroker.V1;
+import "uDataPacketBrokerAPI/v1/stream_identifier.proto";
+
+/**
+ * Requests packets from the desired streams beginning with (and including) the given 
+ * sequence number for that stream.  Note, this is best effort and it is possible that 
+ * the packet with the specified sequence number has been deleted.  If a stream is 
+ * specified that does not yet exist then upon its existence this subscriber will
+ * begin receiving data.  When backfill completes this behaves like StreamSelected.
+ */
+message StreamSelectedFromSequenceRequest {
+   /// 
+   message SelectedStream {
+      /// The stream identifier.
+      StreamIdentifier identifier = 1;
+      /// The stream's starting sequence number.
+      uint64 sequence_number = 2;
+   }
+   /// A request identifier.
+   string identifier = 1 [default = ""];
+   /// The desired streams.
+   repeated SelectedStreams selected_streams = 2;
+}
