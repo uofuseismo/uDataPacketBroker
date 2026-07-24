@@ -1,6 +1,6 @@
 edition = "2023";
 
-package uDataPacketBrokerAPI.V1;
+package UDataPacketBrokerAPI.V1;
 
 /**
  * Identifies a stream by its network, station, channel, and location code.
