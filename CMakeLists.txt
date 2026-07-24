@@ -89,9 +89,10 @@ set(PROTO_SRC
     uDataPacketBrokerAPI/v1/publish_service.proto
     uDataPacketBrokerAPI/v1/stream_all_request.proto
     uDataPacketBrokerAPI/v1/stream_all_from_sequence_request.proto
-    #uDataPacketBrokerAPI/v1/stream_selected_request.proto
+    uDataPacketBrokerAPI/v1/stream_selected_request.proto
     uDataPacketBrokerAPI/v1/stream_selected_from_sequence_request.proto
-    uDataPacketBrokerAPI/v1/stream_identifier.proto)
+    uDataPacketBrokerAPI/v1/stream_identifier.proto
+    uDataPacketBrokerAPI/v1/subscribe_service.proto)
  
 if (BUILD_SHARED_LIBS)
    add_library(libuDataPacketBroker SHARED ${LIBRARY_SRC} ${PROTO_SRC})
