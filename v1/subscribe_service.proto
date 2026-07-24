@@ -35,4 +35,9 @@ service SubscribeService {
     /// attempt to return the packets for stations beginning at the provided sequence
     /// numbers - i.e., packets with lower sequence numbers will not be returned.
     rpc StreamSelectedFromSequence(StreamSelectedFromSequenceRequest) returns(stream Packet) {}; 
+
+    /// Lists the streams that are currently available.  Note, this is a fairly slow operation
+    /// and it can be invalidated if a data stream drops off.  Hitting this endpoint often is
+    /// not recommended.
+    rpc ListAvailableStreams(AvailableStreamsRequest) returns(AvailableStreamsResponse) {};
 }

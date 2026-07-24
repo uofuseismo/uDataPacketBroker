@@ -1,0 +1,13 @@
+edition = "2023";
+
+package UDataPacketBrokerAPI.V1;
+
+/**
+ * Requests a list of currently available streams.  Note, this is a fairly expensive
+ * operation and the data can go stale so it is not recommended to use this endpoint
+ * often.
+ */
+message AvailableStreamsRequest {
+   /// A request identifier.
+   string identifier = 1 [default = ""];
+}
