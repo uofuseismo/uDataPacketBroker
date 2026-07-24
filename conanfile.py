@@ -2,7 +2,7 @@ from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.cmake import cmake_layout, CMake, CMakeDeps, CMakeToolchain
 
-class uDataPacketCacheConan(ConanFile):
+class uDataPacketBrokerConan(ConanFile):
    name = "uDataPacketDataBroker"
    #version = "0.0.1"
    license = "MIT"
