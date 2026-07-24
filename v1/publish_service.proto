@@ -2,8 +2,8 @@ edition = "2023";
 
 package UDataPacketBrokerAPI.V1;
 
-import "uDataPacketBroker/v1/packet.proto";
-import "uDataPacketBroker/v1/publish_response.proto";
+import "uDataPacketBrokerAPI/v1/packet.proto";
+import "uDataPacketBrokerAPI/v1/publish_response.proto";
 
 /*!
  * Applications importing or forwarding data send their seismic data packets to 
