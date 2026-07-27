@@ -162,8 +162,10 @@ public:
             }
             catch (const std::exception &e)
             {
-                SPDLOG_LOGGER_DEBUG(mLogger, "Rejected packet: {}", e.what());
-                ++mRejectedPackets;
+                SPDLOG_LOGGER_WARN(mLogger,
+                                   "Rejected packet because server error: {}",
+                                   e.what());
+                // TODO Update metrics
             }
             if (mKeepRunning->load(std::memory_order_relaxed))
             {
