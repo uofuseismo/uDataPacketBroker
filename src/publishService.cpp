@@ -165,7 +165,8 @@ public:
                 SPDLOG_LOGGER_WARN(mLogger,
                                    "Rejected packet because server error: {}",
                                    e.what());
-                // TODO Update metrics
+                // Nothing to update the exceptional case is obtained by
+                // by subtraction in the monitoring queue.
             }
             if (mKeepRunning->load(std::memory_order_relaxed))
             {
