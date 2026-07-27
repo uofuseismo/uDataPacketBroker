@@ -162,7 +162,7 @@ public:
                 mCallback(std::move(mCurrentPacket));
                 mInvalidMessageCounter = 0;
                 // All good - publisher can start from here
-                *mLastStreamIdentifier.mutable_last_stream_identifier()
+                *mLastStreamIdentifier.mutable_stream_identifier()
                     = std::move(lastStreamIdentifier);
                 mLastStreamIdentifier.set_sequence_number(lastSequenceNumber);
             }
