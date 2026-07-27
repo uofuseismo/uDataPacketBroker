@@ -20,7 +20,7 @@ message PublishResponse {
       uint64 sequence_number = 2;
    }
    /// Identifying information for the last packet received from each stream.
-   repeated LastPacketIdentifier last_packet_identifiers = 1;
+   repeated LastPacketIdentifier last_packet_identifier = 1;
    /// The number of packets the client has submitted to the middleware.
    uint64 total_packets = 2;
    /// The number of invalid packets submitted to the middleware.
