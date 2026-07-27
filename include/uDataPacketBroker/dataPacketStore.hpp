@@ -57,21 +57,16 @@ public:
     [[nodiscard]] virtual bool write(const std::pair<std::chrono::nanoseconds, UDataPacketBrokerAPI::V1::Packet> &receiptTimeAnData);
     [[nodiscard]] virtual bool write(std::pair<std::chrono::nanoseconds, UDataPacketBrokerAPI::V1::Packet> &&receiptTimeAndData);
     /// @brief Writes a collection of packets.
-    /// @param[in] receiptTimeAndData  The time the packet was received
-    ///                                and payload.  Note, the calling
-    ///                                thread has updated the packet's
-    ///                                sequence numbers prior to writing.
+    /// @param[in] receiptTimesAndData  The times the packets were received
+    ///                                 and the payload.  Note, the calling
+    ///                                 thread has updated the packet's
+    ///                                 sequence numbers prior to writing.
     /// @result The packets that were not successfully written.
     /// @note If certain packets were not successfully written then it
     ///       is possible to retry.
     /// @throws std::runtime_error if \c isInitialized() is false.
     [[nodiscard]] virtual std::vector<UDataPacketBrokerAPI::V1::Packet>
-        write(const std::vector<std::pair<std::chrono::nanoseconds, UDataPacketBrokerAPI::V1::Packet>> &receiptTimeAndData);
-    /// @brief Writes a collection of packets that have been serialized.
-    [[nodiscard]] virtual std::vector<UDataPacketBrokerAPI::V1::Packet>
-        write(std::vector<std::pair<std::chrono::nanoseconds, 
-                                    std::pair<PacketVersion, std::string>
-                                   >> &&receiptTimeAndData) = 0;
+        write(const std::vector<std::pair<std::chrono::nanoseconds, UDataPacketBrokerAPI::V1::Packet>> &receiptTimesAndData) = 0;
     /// @}
 
     /// @name Used By Monitor Thread

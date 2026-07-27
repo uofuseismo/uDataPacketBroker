@@ -10,6 +10,9 @@
 
 using namespace UDataPacketBroker;
 
+/// Destructor
+IDataPacketStore::~IDataPacketStore() = default;
+
 /// One-off write
 bool IDataPacketStore::write(
     const std::pair
@@ -41,6 +44,7 @@ bool IDataPacketStore::write(
     return write(receiptTimesAndData).empty() ? false : true;
 }
 
+/*
 /// Writes packets
 std::vector<UDataPacketBrokerAPI::V1::Packet> IDataPacketStore::write(
     const std::vector
@@ -81,6 +85,7 @@ std::vector<UDataPacketBrokerAPI::V1::Packet> IDataPacketStore::write(
     }
     return write(std::move(workspace));
 }
+*/
 
 /// One-off query
 std::vector<IDataPacketStore::QueryResponse> IDataPacketStore::query(

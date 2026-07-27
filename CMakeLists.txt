@@ -79,6 +79,8 @@ set(LIBRARY_SRC
     src/metricsSingleton.cpp
     src/publishService.cpp
     src/publishServiceOptions.cpp
+    src/rocksDatabase.cpp
+    src/rocksDatabaseOptions.cpp
     src/subscribeServiceOptions.cpp
     src/utilities.cpp
     src/version.cpp)
@@ -89,6 +91,8 @@ set(LIBRARY_HEADER_FILES
     include/${PROJECT_NAME}/metricsSingleton.hpp
     include/${PROJECT_NAME}/publishService.hpp
     include/${PROJECT_NAME}/publishServiceOptions.hpp
+    include/${PROJECT_NAME}/rocksDatabase.hpp
+    include/${PROJECT_NAME}/rocksDatabaseOptions.hpp
     include/${PROJECT_NAME}/subscribeServiceOptions.hpp
     include/${PROJECT_NAME}/utilities.hpp
     include/${PROJECT_NAME}/version.hpp)
@@ -193,6 +197,7 @@ target_link_libraries(uDataPacketBroker
 if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
    add_executable(unitTests
                   testing/options.cpp
+                  testing/rocksDatabase.cpp
                   testing/utilities.cpp)
    set_target_properties(unitTests PROPERTIES
                          CXX_STANDARD 23

@@ -162,9 +162,9 @@ public:
                 mCallback(std::move(mCurrentPacket));
                 mInvalidMessageCounter = 0;
                 // All good - publisher can start from here
-                *mLastStreamIdentifier.mutable_stream_identifier()
+                *mLastPacketIdentifier.mutable_stream_identifier()
                     = std::move(lastStreamIdentifier);
-                mLastStreamIdentifier.set_sequence_number(lastSequenceNumber);
+                mLastPacketIdentifier.set_sequence_number(lastSequenceNumber);
             }
             catch (const std::invalid_argument &)
             {
@@ -191,9 +191,9 @@ public:
                                    e.what());
                 // Nothing to update the exceptional case is obtained by
                 // by subtraction in the monitoring queue.
-                // Technically, the packet was okay so I should note the 
-                // identity but in a really fortuitous case of broker quits
-                // the publisher will get another shot at this.
+                // Technically, the packet was okay but, as per the API,
+                // I won't tag it as the last packet because it was not
+                // successfully processed.
             }
             // Packet propagated - now see if there's something new to read.
             if (mKeepRunning->load(std::memory_order_relaxed))
@@ -216,7 +216,7 @@ public:
             mResponse->set_total_packets(mTotalPackets);
             mResponse->set_invalid_packets(mInvalidPackets);
             *mResponse->mutable_last_packet_identifier()
-                = std::move(mLastStreamIdentifier);
+                = std::move(mLastPacketIdentifier);
             if (mKeepRunning->load(std::memory_order_relaxed))
             {
                 Finish(grpc::Status::OK);
@@ -297,8 +297,8 @@ public:
         UDataPacketBroker::MetricsSingleton::getInstance()
     };
     std::string mPeer;
-    UDataPacketBrokerAPI::V1::PublishResponse::LastStreamIdentifier
-        mLastStreamIdentifier;
+    UDataPacketBrokerAPI::V1::PublishResponse::LastPacketIdentifier
+        mLastPacketIdentifier;
     uint64_t mTotalPackets{0};
     uint64_t mInvalidPackets{0};
     uint32_t mInvalidMessageCounter{0};
