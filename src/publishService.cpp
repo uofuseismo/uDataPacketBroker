@@ -102,13 +102,28 @@ public:
 
         const auto grpcOptions = options.getGRPCOptions();
         const auto accessToken = grpcOptions.getAccessToken();
-        if (isSecured && accessToken != std::nullopt)
+        if (isSecured)
         {
-            if (!::validatePublisher(context, *accessToken))
+            if (accessToken != std::nullopt)
             {
-                SPDLOG_LOGGER_WARN(mLogger, "Unauthorized publisher {} rejected", mPeer);
-                Finish({grpc::StatusCode::UNAUTHENTICATED, "Invalid access token"});
-                return;
+                if (!::validatePublisher(context, *accessToken))
+                {
+                    SPDLOG_LOGGER_WARN(mLogger,
+                                       "Unauthorized publisher {} rejected",
+                                       mPeer);
+                   Finish({grpc::StatusCode::UNAUTHENTICATED,
+                           "Invalid access token"});
+                   return;
+                }
+            }
+        }
+        else
+        {
+            if (accessToken != std::nullopt)
+            {
+                SPDLOG_LOGGER_ERROR(
+                   mLogger,
+                   "Publish service not checking access token");
             }
         }
 
@@ -122,7 +137,7 @@ public:
             "{} connected; PublishService managing {} publishers ({} pct utilized)",
             mPeer,
             nPublishers,
-            utilization);
+            utilization*100);
         if (mKeepRunning->load())
         {
             StartRead(&mCurrentPacket);
@@ -141,11 +156,20 @@ public:
             try
             {
                 SPDLOG_LOGGER_DEBUG(mLogger, "Pushing current packet");
+                auto lastSequenceNumber = mCurrentPacket.sequence_number();
+                auto lastStreamIdentifier
+                    = mCurrentPacket.stream_identifier(); 
                 mCallback(std::move(mCurrentPacket));
                 mInvalidMessageCounter = 0;
+                // All good - publisher can start from here
+                *mLastStreamIdentifier.mutable_last_stream_identifier()
+                    = std::move(lastStreamIdentifier);
+                mLastStreamIdentifier.set_sequence_number(lastSequenceNumber);
             }
             catch (const std::invalid_argument &)
             {
+                // N.B. I don't want another poison pill so don't update
+                // last packet identifier.
                 ++mInvalidMessageCounter;
                 ++mInvalidPackets;
                 if (mInvalidMessageCounter > mMaximumConsecutiveInvalidMessages)
@@ -167,7 +191,11 @@ public:
                                    e.what());
                 // Nothing to update the exceptional case is obtained by
                 // by subtraction in the monitoring queue.
+                // Technically, the packet was okay so I should note the 
+                // identity but in a really fortuitous case of broker quits
+                // the publisher will get another shot at this.
             }
+            // Packet propagated - now see if there's something new to read.
             if (mKeepRunning->load(std::memory_order_relaxed))
             {
                 StartRead(&mCurrentPacket);
@@ -187,6 +215,8 @@ public:
 #endif
             mResponse->set_total_packets(mTotalPackets);
             mResponse->set_invalid_packets(mInvalidPackets);
+            *mResponse->mutable_last_packet_identifier()
+                = std::move(mLastStreamIdentifier);
             if (mKeepRunning->load(std::memory_order_relaxed))
             {
                 Finish(grpc::Status::OK);
@@ -223,7 +253,7 @@ public:
                 "{} disconnected; Now managing {} publishers ({} pct utilized)",
                 mPeer,
                 nPublishers,
-                utilization);
+                utilization*100);
         }
         delete this;
     }
@@ -267,6 +297,8 @@ public:
         UDataPacketBroker::MetricsSingleton::getInstance()
     };
     std::string mPeer;
+    UDataPacketBrokerAPI::V1::PublishResponse::LastStreamIdentifier
+        mLastStreamIdentifier;
     uint64_t mTotalPackets{0};
     uint64_t mInvalidPackets{0};
     uint32_t mInvalidMessageCounter{0};
@@ -431,7 +463,8 @@ PublishService::PublishService(
 /// Start the publish service
 std::future<void> PublishService::start()
 {
-    return std::async(&PublishServiceImpl::start, &*pImpl);
+    return std::async(std::launch::async,
+                      &PublishServiceImpl::start, &*pImpl);
 }
 
 /// Stop the publish service
