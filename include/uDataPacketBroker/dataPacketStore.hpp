@@ -31,6 +31,11 @@ public:
         /// The sequence number for the subscriber.
         uint64_t sequenceNumber;
     };
+    /// @brief Defines the API packet version should I ever upgrade the API.
+    enum class PacketVersion
+    {
+        One = 1 
+    }; 
 public:
     /// @brief On startup the broker uses this to get the global
     ///        sequence number that was last written prior to 
@@ -64,7 +69,9 @@ public:
         write(const std::vector<std::pair<std::chrono::nanoseconds, UDataPacketBrokerAPI::V1::Packet>> &receiptTimeAndData);
     /// @brief Writes a collection of packets that have been serialized.
     [[nodiscard]] virtual std::vector<UDataPacketBrokerAPI::V1::Packet>
-        write(std::vector<std::pair<std::chrono::nanoseconds, std::string>> &&receiptTimeAndData) = 0;
+        write(std::vector<std::pair<std::chrono::nanoseconds, 
+                                    std::pair<PacketVersion, std::string>
+                                   >> &&receiptTimeAndData) = 0;
     /// @}
 
     /// @name Used By Monitor Thread

@@ -61,7 +61,12 @@ public:
     ///       is possible to retry.
     /// @throws std::runtime_error if \c isInitialized() is false.
     [[nodiscard]] std::vector<UDataPacketBrokerAPI::V1::Packet>
-        write(std::vector<std::pair<std::chrono::nanoseconds, std::string>> &&receiptTimeAndData) final;
+        write(std::vector<
+                 std::pair
+                 <
+                     std::chrono::nanoseconds, 
+                     std::pair<IDataPacketStore::PacketVersion, std::string>
+                 > &&receiptTimeAndData) final;
     /// @}
 
     /// @name Used By Monitor Thread

@@ -56,18 +56,27 @@ std::vector<UDataPacketBrokerAPI::V1::Packet> IDataPacketStore::write(
     {
         throw std::invalid_argument("No data to write");
     }
-    std::vector<std::pair<std::chrono::nanoseconds, std::string>> workspace;
+    std::vector
+    <
+        std::pair
+        <
+            std::chrono::nanoseconds,
+            std::pair<PacketVersion, std::string>
+        >
+    > workspace;
     workspace.reserve(receiptTimeAndData.size());
     for (auto &receiptTimeAndDataPair : receiptTimeAndData)
     {
         std::string payload;
         receiptTimeAndDataPair.second.SerializeToString(&payload);    
+        auto versionPayload
+            = std::make_pair(PacketVersion::One, std::move(payload));
         auto newElement
-           = std::make_pair
-             (
-                 receiptTimeAndDataPair.first,
-                 std::move(payload)
-             );
+            = std::make_pair
+              (
+                  receiptTimeAndDataPair.first,
+                  std::move(versionPayload)
+              );
          workspace.push_back(std::move(newElement));
     }
     return write(std::move(workspace));

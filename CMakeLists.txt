@@ -77,6 +77,7 @@ set(LIBRARY_SRC
     src/dataPacketStore.cpp
     src/grpcServerOptions.cpp
     src/metricsSingleton.cpp
+    src/publishService.cpp
     src/publishServiceOptions.cpp
     src/subscribeServiceOptions.cpp
     src/utilities.cpp
@@ -86,6 +87,7 @@ set(LIBRARY_HEADER_FILES
     include/${PROJECT_NAME}/dataPacketStore.hpp
     include/${PROJECT_NAME}/grpcServerOptions.hpp
     include/${PROJECT_NAME}/metricsSingleton.hpp
+    include/${PROJECT_NAME}/publishService.hpp
     include/${PROJECT_NAME}/publishServiceOptions.hpp
     include/${PROJECT_NAME}/subscribeServiceOptions.hpp
     include/${PROJECT_NAME}/utilities.hpp

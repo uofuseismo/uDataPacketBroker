@@ -6,20 +6,22 @@
 namespace UDataPacketBroker
 {
  class BrokerOptions;
+ class IDataPacketStore;
 }
 namespace UDataPacketBroker
 { 
 /// @class Broker broker.hpp
 /// @brief This is the application middleware.  It basically does all the work.
 ///        It receives data from the publisher clients and propagates them to the
-///        subscriber clients whilst updating the RocksDB.
+///        subscriber clients whilst updating the underlying data store.
 /// @copyright Ben Baker (University of Utah) distributed under the MIT
 ///            NO AI license.
 class Broker
 {
 public:
-    /// @brief Initializes the broker from the given options and logger.
+    /// @brief Initializes the broker from the given options, store, and logger.
     Broker(const BrokerOptions &options,
+           std::shared_ptr<IDataPacketStore> store,
            std::shared_ptr<spdlog::logger> logger);
 
     /// @result True indicates the broker is initialized.
