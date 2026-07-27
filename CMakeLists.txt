@@ -74,10 +74,20 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
 
 set(LIBRARY_SRC
     src/broker.cpp
+    src/dataPacketStore.cpp
+    src/grpcServerOptions.cpp
+    src/metricsSingleton.cpp
+    src/publishServiceOptions.cpp
+    src/subscribeServiceOptions.cpp
     src/utilities.cpp
     src/version.cpp)
 set(LIBRARY_HEADER_FILES
     include/${PROJECT_NAME}/broker.hpp
+    include/${PROJECT_NAME}/dataPacketStore.hpp
+    include/${PROJECT_NAME}/grpcServerOptions.hpp
+    include/${PROJECT_NAME}/metricsSingleton.hpp
+    include/${PROJECT_NAME}/publishServiceOptions.hpp
+    include/${PROJECT_NAME}/subscribeServiceOptions.hpp
     include/${PROJECT_NAME}/utilities.hpp
     include/${PROJECT_NAME}/version.hpp)
 set(PROTO_SRC
@@ -179,7 +189,22 @@ target_link_libraries(uDataPacketBroker
 
 
 if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
-
+   add_executable(unitTests
+                  testing/options.cpp
+                  testing/utilities.cpp)
+   set_target_properties(unitTests PROPERTIES
+                         CXX_STANDARD 23
+                         CXX_STANDARD_REQUIRED YES
+                         CXX_EXTENSIONS NO)
+   target_include_directories(unitTests
+                              PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+                              PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+   target_link_libraries(unitTests
+                         PRIVATE uDataPacketBroker::libuDataPacketBroker
+                                 protobuf::libprotobuf
+                                 Catch2::Catch2WithMain)
+   include(Catch)
+   catch_discover_tests(unitTests)
 endif()
 
 ##########################################################################################
