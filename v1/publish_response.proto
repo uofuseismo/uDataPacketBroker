@@ -22,9 +22,9 @@ message PublishResponse {
    /// Identifying information for the last packet received from each stream.
    repeated LastPacketIdentifier last_packet_identifiers = 1;
    /// The number of packets the client has submitted to the middleware.
-   uint64 packets_received = 2;
+   uint64 total_packets = 2;
    /// The number of invalid packets submitted to the middleware.
-   uint64 invalid_packets_received = 3;
+   uint64 invalid_packets = 3;
    /// Any additional information the clients should know on shutdown.  For example, this 
    /// could warn that this API is going to be deprecated, etc.
    string messages = 4 [default = ""];
