@@ -207,7 +207,8 @@ if (PROJECT_IS_TOP_LEVEL AND ${BUILD_TESTS})
                               PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
                               PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
    target_link_libraries(unitTests
-                         PRIVATE uDataPacketBroker::libuDataPacketBroker
+                         PRIVATE spdlog::spdlog_header_only
+                                 uDataPacketBroker::libuDataPacketBroker
                                  protobuf::libprotobuf
                                  Catch2::Catch2WithMain)
    include(Catch)
