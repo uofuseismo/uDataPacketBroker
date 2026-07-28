@@ -74,6 +74,7 @@ configure_file(${CMAKE_SOURCE_DIR}/src/version.hpp.in
 
 set(LIBRARY_SRC
     src/broker.cpp
+    src/brokerOptions.cpp
     src/dataPacketStore.cpp
     src/grpcServerOptions.cpp
     src/metricsSingleton.cpp
@@ -86,6 +87,7 @@ set(LIBRARY_SRC
     src/version.cpp)
 set(LIBRARY_HEADER_FILES
     include/${PROJECT_NAME}/broker.hpp
+    include/${PROJECT_NAME}/brokerOptions.hpp
     include/${PROJECT_NAME}/dataPacketStore.hpp
     include/${PROJECT_NAME}/grpcServerOptions.hpp
     include/${PROJECT_NAME}/metricsSingleton.hpp

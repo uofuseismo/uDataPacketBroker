@@ -60,8 +60,8 @@ TEST_CASE("RocksDatabase round trip", "[RocksDatabase]")
 {
     const auto databasePath = ::uniqueDatabasePath();
     RocksDatabaseOptions options;
-    options.setDatabase(databasePath);
-    options.enableOverwWriteIfExists();
+    options.setDatabaseDirectory(databasePath);
+    options.enableOverWriteIfExists();
 
     {
         RocksDatabase store(options, nullptr);
@@ -84,6 +84,9 @@ TEST_CASE("RocksDatabase round trip", "[RocksDatabase]")
 
         const auto notWritten = store.write(batch);
         REQUIRE(notWritten.empty());
+        // Explicitly persist the memtable (what stop() does on graceful
+        // shutdown, since the write-ahead-log is disabled).
+        REQUIRE_NOTHROW(store.flush());
 
         SECTION("Global sequence number is the max written")
         {
@@ -145,12 +148,38 @@ TEST_CASE("RocksDatabase round trip", "[RocksDatabase]")
             REQUIRE(sawHHZ);
             REQUIRE(sawEHZ);
         }
+
+        SECTION("Truncate drops the oldest packets across channels")
+        {
+            REQUIRE(store.getSizeInBytes() > 0);
+
+            // Drop the oldest 2 global seqs (HHZ seq 1, EHZ seq 2).
+            REQUIRE(store.truncateOldest(2) == 2);
+            // The max is preserved - only the old tail was trimmed.
+            REQUIRE(store.getGlobalSequenceNumber() == 5);
+            const auto hhz = store.query({{::makeIdentifier("HHZ"), 0}});
+            REQUIRE(hhz.size() == 2);
+            REQUIRE(hhz[0].sequenceNumber == 3);
+            const auto ehz = store.query({{::makeIdentifier("EHZ"), 0}});
+            REQUIRE(ehz.size() == 1);
+            REQUIRE(ehz[0].sequenceNumber == 4);
+            // Both channels still have data, so both survive.
+            REQUIRE(store.queryAvailableStreams().size() == 2);
+
+            // Purge the remainder: registry empties, streams are reaped.
+            REQUIRE(store.truncateOldest(1000) == 3);
+            REQUIRE(store.queryAvailableStreams().empty());
+            REQUIRE(store.getGlobalSequenceNumber() == 0);
+
+            // Nothing left - returns 0 so the monitor loop stops.
+            REQUIRE(store.truncateOldest(256) == 0);
+        }
     }
 
     SECTION("State survives a reopen")
     {
         RocksDatabaseOptions reopenOptions;
-        reopenOptions.setDatabase(databasePath);  // do not overwrite
+        reopenOptions.setDatabaseDirectory(databasePath);  // do not overwrite
         RocksDatabase reopened(reopenOptions, nullptr);
         REQUIRE(reopened.isInitialized());
         REQUIRE(reopened.getGlobalSequenceNumber() == 5);

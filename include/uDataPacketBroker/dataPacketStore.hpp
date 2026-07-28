@@ -75,6 +75,29 @@ public:
     /// @brief Removes packets acquired before a given time.
     /// @param[in] dropBefore   Packets acquired before this time.
     virtual void compact(const std::chrono::nanoseconds &dropBefore) = 0;
+    /// @brief Flushes any buffered (in-memory) packets to durable storage.
+    ///        The default does nothing; a store that buffers writes in memory
+    ///        overrides this so a graceful shutdown does not lose data.
+    virtual void flush();
+
+    /// @result The size of the store in bytes.  This is the figure a
+    ///         size-bounded deployment is measured against - a persistent
+    ///         volume claim's quota for an on-disk store, or the memory request
+    ///         for an in-memory store.  Every store must implement this.
+    [[nodiscard]] virtual size_t getSizeInBytes() const = 0;
+
+    /// @brief Purges (approximately) the oldest \c nPackets packets and
+    ///        reclaims their space.  A monitor thread loops this while
+    ///        \c getSizeInBytes() exceeds a safe limit, so the implementation
+    ///        MUST actually free the space here such that a subsequent
+    ///        \c getSizeInBytes() reflects the removal - for an on-disk store
+    ///        (e.g., RocksDB) that means compacting after deleting; for a pure
+    ///        in-memory store it is a trivial drop from the front.
+    /// @param[in] nPackets  The number of oldest packets to purge.
+    /// @result The number of packets actually purged.  This is 0 when there is
+    ///         nothing left to purge, which the caller uses to stop looping so
+    ///         it never spins when no progress can be made.
+    [[nodiscard]] virtual size_t truncateOldest(size_t nPackets) = 0;
     /// @}
 
     /// @name Used By Consumer Thread(s)

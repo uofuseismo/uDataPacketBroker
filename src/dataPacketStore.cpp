@@ -13,6 +13,11 @@ using namespace UDataPacketBroker;
 /// Destructor
 IDataPacketStore::~IDataPacketStore() = default;
 
+/// Flush - the default does nothing; buffering stores override this.
+void IDataPacketStore::flush()
+{
+}
+
 /// One-off write
 bool IDataPacketStore::write(
     const std::pair

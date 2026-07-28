@@ -47,6 +47,16 @@ int64_t MetricsSingleton::getTotalNumberOfPacketsReceived() const noexcept
     return mTotalNumberOfPacketsReceived.load(std::memory_order_relaxed);
 }
 
+void MetricsSingleton::incrementNumberOfInvalidPacketsReceived() noexcept
+{
+    mNumberOfInvalidPacketsReceived.fetch_add(1, std::memory_order_relaxed);
+}
+
+int64_t MetricsSingleton::getNumberOfInvalidPacketsReceived() const noexcept
+{
+    return mNumberOfInvalidPacketsReceived.load(std::memory_order_relaxed);
+}
+
 void MetricsSingleton::incrementNumberOfPacketsWrittenToImportQueue() noexcept
 {
     mNumberOfPacketsAddedToImportQueue.fetch_add(1, std::memory_order_relaxed);

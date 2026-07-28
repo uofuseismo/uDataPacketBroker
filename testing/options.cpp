@@ -150,10 +150,11 @@ TEST_CASE("RocksDatabase options", "[RocksDatabaseOptions]")
     SECTION("Defaults")
     {
         const RocksDatabaseOptions options;
-        REQUIRE(options.hasDatabase() == false);
+        REQUIRE(options.hasDatabaseDirectory() == false);
         REQUIRE(options.getRetention() == std::chrono::hours {1});
-        REQUIRE(options.getWriteBufferSize()
+        REQUIRE(options.getWriteBufferSizeInBytes()
                 == (static_cast<size_t> (128) << 20));
+        REQUIRE(options.getMaximumNumberOfMemoryTables() == 2);
         REQUIRE(options.overWriteIfExists() == false);
         REQUIRE(options.useWriteAheadLog() == false);
     }
@@ -163,32 +164,37 @@ TEST_CASE("RocksDatabase options", "[RocksDatabaseOptions]")
         const std::filesystem::path databaseFile{"/tmp/uDataPacketBroker/db"};
         constexpr std::chrono::seconds retention{7200};
         constexpr size_t writeBufferSize{static_cast<size_t> (64) << 20};
+        constexpr int maximumMemoryTables{4};
         RocksDatabaseOptions options;
 
         // Invalid values are rejected.
-        REQUIRE_THROWS(options.setDatabase(std::filesystem::path {}));
+        REQUIRE_THROWS(options.setDatabaseDirectory(std::filesystem::path {}));
         REQUIRE_THROWS(options.setRetention(std::chrono::seconds {0}));
         REQUIRE_THROWS(options.setRetention(std::chrono::seconds {-1}));
-        REQUIRE_THROWS(options.setWriteBufferSize(0));
+        REQUIRE_THROWS(options.setWriteBufferSizeInBytes(0));
+        REQUIRE_THROWS(options.setMaximumNumberOfMemoryTables(0));
         // Unset database throws on read.
-        REQUIRE_THROWS(options.getDatabase());
+        REQUIRE_THROWS(options.getDatabaseDirectory());
 
-        REQUIRE_NOTHROW(options.setDatabase(databaseFile));
+        REQUIRE_NOTHROW(options.setDatabaseDirectory(databaseFile));
         REQUIRE_NOTHROW(options.setRetention(retention));
-        REQUIRE_NOTHROW(options.setWriteBufferSize(writeBufferSize));
-        options.enableOverwWriteIfExists();
+        REQUIRE_NOTHROW(options.setWriteBufferSizeInBytes(writeBufferSize));
+        REQUIRE_NOTHROW(
+            options.setMaximumNumberOfMemoryTables(maximumMemoryTables));
+        options.enableOverWriteIfExists();
         options.enableWriteAheadLog();
 
         // Toggles flip both ways.
-        options.disableOverwWiteIfExists();
+        options.disableOverWriteIfExists();
         REQUIRE(options.overWriteIfExists() == false);
-        options.enableOverwWriteIfExists();
+        options.enableOverWriteIfExists();
 
         const RocksDatabaseOptions copy{options};
-        REQUIRE(copy.hasDatabase() == true);
-        REQUIRE(copy.getDatabase() == databaseFile);
+        REQUIRE(copy.hasDatabaseDirectory() == true);
+        REQUIRE(copy.getDatabaseDirectory() == databaseFile);
         REQUIRE(copy.getRetention() == retention);
-        REQUIRE(copy.getWriteBufferSize() == writeBufferSize);
+        REQUIRE(copy.getWriteBufferSizeInBytes() == writeBufferSize);
+        REQUIRE(copy.getMaximumNumberOfMemoryTables() == maximumMemoryTables);
         REQUIRE(copy.overWriteIfExists() == true);
         REQUIRE(copy.useWriteAheadLog() == true);
     }

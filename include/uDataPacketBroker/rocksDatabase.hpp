@@ -76,6 +76,18 @@ public:
     /// @brief Removes packets acquired before a given time.
     /// @param[in] dropBefore   Packets acquired before this time.
     void compact(const std::chrono::nanoseconds &dropBefore) final;
+    /// @brief Flushes the memtables to durable storage (SSTs).  This is what
+    ///        makes a graceful shutdown durable when the write-ahead-log is
+    ///        disabled.
+    void flush() final;
+    /// @result The on-disk size of the database directory in bytes (what a
+    ///         persistent volume claim's quota is measured against).
+    [[nodiscard]] size_t getSizeInBytes() const final;
+    /// @brief Purges the oldest packets across all channels (lowest global
+    ///        sequence numbers) and compacts to reclaim the space.
+    /// @param[in] nPackets  The number of oldest packets to purge.
+    /// @result The number of packets purged; 0 when the database is empty.
+    [[nodiscard]] size_t truncateOldest(size_t nPackets) final;
     /// @}
 
     /// @name Used By Consumer Thread(s)

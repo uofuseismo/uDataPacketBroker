@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -83,7 +84,7 @@ public:
         mOptions(options),
         mLogger(std::move(logger))
     {
-        if (!mOptions.hasDatabase())
+        if (!mOptions.hasDatabaseDirectory())
         {
             throw std::invalid_argument("Database not set");
         }
@@ -104,7 +105,7 @@ public:
     // Open the database
     void open()
     {
-        const auto databasePath = mOptions.getDatabase();
+        const auto databasePath = mOptions.getDatabaseDirectory();
         if (databasePath.has_parent_path())
         {
             auto parentPath = databasePath.parent_path();
@@ -139,8 +140,12 @@ public:
 
         // The packets column family: fixed 32-byte channel prefix, prefix
         // bloom filters, and a file-granular ttl that expires whole SSTs.
+        const auto maximumNumberOfMemoryTables
+            = mOptions.getMaximumNumberOfMemoryTables();
+
         rocksdb::ColumnFamilyOptions packetsOptions;
-        packetsOptions.write_buffer_size = mOptions.getWriteBufferSize();
+        packetsOptions.write_buffer_size = mOptions.getWriteBufferSizeInBytes();
+        packetsOptions.max_write_buffer_number = maximumNumberOfMemoryTables;
         packetsOptions.ttl = retentionSeconds;
         packetsOptions.compaction_pri = rocksdb::kOldestSmallestSeqFirst;
         packetsOptions.prefix_extractor.reset(
@@ -156,6 +161,7 @@ public:
         // a silent stream's entry ages out with its packets.
         rocksdb::ColumnFamilyOptions streamsOptions;
         streamsOptions.ttl = retentionSeconds;
+        streamsOptions.max_write_buffer_number = maximumNumberOfMemoryTables;
 
         std::vector<rocksdb::ColumnFamilyDescriptor> descriptors;
         descriptors.emplace_back(rocksdb::kDefaultColumnFamilyName,
@@ -376,6 +382,183 @@ public:
                                 nullptr, nullptr);
     }
 
+    void flush()
+    {
+        if (!mInitialized)
+        {
+            return;
+        }
+        SPDLOG_LOGGER_DEBUG(mLogger, "Flushing database memtables");
+        rocksdb::FlushOptions flushOptions;
+        flushOptions.wait = true;
+        const std::vector<rocksdb::ColumnFamilyHandle *> handles
+            {mPacketsHandle, mStreamsHandle};
+        const auto status = mDatabase->Flush(flushOptions, handles);
+        if (!status.ok())
+        {
+            SPDLOG_LOGGER_ERROR(mLogger,
+                                "Failed to flush database because {}",
+                                status.ToString());
+        }
+    }
+
+    [[nodiscard]] size_t getSizeInBytes() const
+    {
+        if (!mInitialized)
+        {
+            return 0;
+        }
+        // The physical footprint of the whole database directory - what a
+        // persistent volume claim's quota actually meters (SSTs plus WAL,
+        // MANIFEST, LOG, and any obsolete files not yet reclaimed).
+        std::error_code errorCode;
+        std::uintmax_t total{0};
+        const auto directory = mOptions.getDatabaseDirectory();
+        for (const auto &entry :
+                 std::filesystem::recursive_directory_iterator(
+                     directory, errorCode))
+        {
+            if (errorCode)
+            {
+                break;
+            }
+            std::error_code fileErrorCode;
+            if (entry.is_regular_file(fileErrorCode))
+            {
+                const auto fileSize = entry.file_size(fileErrorCode);
+                if (!fileErrorCode)
+                {
+                    total = total + fileSize;
+                }
+            }
+        }
+        return static_cast<size_t> (total);
+    }
+
+    [[nodiscard]] size_t truncateOldest(size_t nPackets)
+    {
+        ensureInitialized();
+        if (nPackets == 0)
+        {
+            return 0;
+        }
+
+        // Snapshot the registry: one tiny entry per channel.
+        struct Entry
+        {
+            std::string streamKey;
+            uint64_t minSequenceNumber;
+            uint64_t maxSequenceNumber;
+            int64_t lastReceivedNanoSeconds;
+        };
+        std::vector<Entry> entries;
+        uint64_t globalMin{std::numeric_limits<uint64_t>::max()};
+        uint64_t globalMax{0};
+        {
+            rocksdb::ReadOptions readOptions;
+            std::unique_ptr<rocksdb::Iterator> iterator(
+                mDatabase->NewIterator(readOptions, mStreamsHandle));
+            for (iterator->SeekToFirst();
+                 iterator->Valid();
+                 iterator->Next())
+            {
+                const auto value = iterator->value();
+                if (value.size() < ::streamsValueLength)
+                {
+                    continue;
+                }
+                Entry entry;
+                entry.streamKey = ::toStringView(iterator->key());
+                entry.minSequenceNumber = ::getBigEndian64(value.data());
+                entry.maxSequenceNumber = ::getBigEndian64(value.data() + 8);
+                entry.lastReceivedNanoSeconds
+                    = static_cast<int64_t> (::getBigEndian64(value.data() + 16));
+                globalMin = std::min(globalMin, entry.minSequenceNumber);
+                globalMax = std::max(globalMax, entry.maxSequenceNumber);
+                entries.push_back(std::move(entry));
+            }
+        }
+        if (entries.empty() || globalMin > globalMax)
+        {
+            return 0;
+        }
+
+        // Because the global counter is dense (one seq per received packet),
+        // dropping the oldest nPackets is dropping seqs [globalMin, cutoff).
+        uint64_t cutoff = globalMin + nPackets;
+        if (cutoff > globalMax + 1)
+        {
+            cutoff = globalMax + 1;   // clamp: purge everything
+        }
+        const auto purged = cutoff - globalMin;
+        if (purged == 0)
+        {
+            return 0;
+        }
+
+        // seq < cutoff is the low-seq tail of *every* channel prefix - not one
+        // contiguous range - so both the delete and the compaction are done
+        // per channel.
+        rocksdb::WriteBatch batch;
+        std::vector<std::pair<std::string, std::string>> compactRanges;
+        for (const auto &entry : entries)
+        {
+            if (entry.minSequenceNumber >= cutoff)
+            {
+                continue;             // nothing old in this channel
+            }
+            std::string rangeBegin{entry.streamKey};
+            ::putBigEndian64(rangeBegin, 0);
+            std::string rangeEnd{entry.streamKey};
+            ::putBigEndian64(rangeEnd, cutoff);
+            batch.DeleteRange(mPacketsHandle, rangeBegin, rangeEnd);
+
+            if (entry.maxSequenceNumber < cutoff)
+            {
+                // Whole channel purged - reap its registry entry.
+                batch.Delete(mStreamsHandle, entry.streamKey);
+            }
+            else
+            {
+                // Survivor - advance its min_seq to the cutoff.
+                std::string streamValue;
+                ::putBigEndian64(streamValue, cutoff);
+                ::putBigEndian64(streamValue, entry.maxSequenceNumber);
+                ::putBigEndian64(streamValue,
+                    static_cast<uint64_t> (entry.lastReceivedNanoSeconds));
+                batch.Put(mStreamsHandle, entry.streamKey, streamValue);
+            }
+            compactRanges.emplace_back(std::move(rangeBegin),
+                                       std::move(rangeEnd));
+        }
+
+        rocksdb::WriteOptions writeOptions;
+        writeOptions.disableWAL = mDisableWriteAheadLog;
+        const auto status = mDatabase->Write(writeOptions, &batch);
+        if (!status.ok())
+        {
+            SPDLOG_LOGGER_ERROR(mLogger,
+                                "Truncation delete failed because {}",
+                                status.ToString());
+            return 0;   // no progress - caller stops looping
+        }
+
+        // DeleteRange only writes tombstones; compact each purged range to
+        // actually reclaim the disk (cost is proportional to what was purged,
+        // not the whole database).
+        const rocksdb::CompactRangeOptions compactOptions;
+        for (const auto &[rangeBegin, rangeEnd] : compactRanges)
+        {
+            const rocksdb::Slice begin{rangeBegin};
+            const rocksdb::Slice end{rangeEnd};
+            mDatabase->CompactRange(compactOptions, mPacketsHandle,
+                                    &begin, &end);
+        }
+        mDatabase->CompactRange(compactOptions, mStreamsHandle,
+                                nullptr, nullptr);
+        return static_cast<size_t> (purged);
+    }
+
     [[nodiscard]] std::vector<IDataPacketStore::QueryResponse>
         query(const std::vector<std::pair<StreamIdentifier, uint64_t>>
                  &identifiersAndSequenceNumbers) const
@@ -504,6 +687,24 @@ std::vector<UDataPacketBrokerAPI::V1::Packet> RocksDatabase::write(
 void RocksDatabase::compact(const std::chrono::nanoseconds &dropBefore)
 {
     pImpl->compact(dropBefore);
+}
+
+/// Flush
+void RocksDatabase::flush()
+{
+    pImpl->flush();
+}
+
+/// Size on disk
+size_t RocksDatabase::getSizeInBytes() const
+{
+    return pImpl->getSizeInBytes();
+}
+
+/// Truncate oldest
+size_t RocksDatabase::truncateOldest(size_t nPackets)
+{
+    return pImpl->truncateOldest(nPackets);
 }
 
 /// Query

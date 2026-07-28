@@ -11,11 +11,12 @@ using namespace UDataPacketBroker;
 class RocksDatabaseOptions::RocksDatabaseOptionsImpl
 {
 public:
-    std::filesystem::path mDatabase;
+    std::filesystem::path mDatabaseDirectory;
     std::chrono::seconds mRetention{std::chrono::hours {1}};
-    size_t mWriteBufferSize{static_cast<size_t> (128) << 20};
+    size_t mWriteBufferSizeInBytes{static_cast<size_t> (128) << 20};
+    int mMaximumNumberOfMemoryTables{2};
     bool mEnableWriteAheadLog{false};
-    bool mOverwriteIfExists{false};
+    bool mOverWriteIfExists{false};
 };
 
 /// Constructor
@@ -56,45 +57,45 @@ RocksDatabaseOptions::operator=(RocksDatabaseOptions &&options) noexcept
     return *this;
 }
 
-/// Database path
-void RocksDatabaseOptions::setDatabase(
-    const std::filesystem::path &databaseFile)
+/// Database directory
+void RocksDatabaseOptions::setDatabaseDirectory(
+    const std::filesystem::path &databaseDirectory)
 {
-    if (databaseFile.empty())
+    if (databaseDirectory.empty())
     {
-        throw std::invalid_argument("Database file is empty");
+        throw std::invalid_argument("Database directory is empty");
     }
-    pImpl->mDatabase = databaseFile;
+    pImpl->mDatabaseDirectory = databaseDirectory;
 }
 
-std::filesystem::path RocksDatabaseOptions::getDatabase() const
+std::filesystem::path RocksDatabaseOptions::getDatabaseDirectory() const
 {
-    if (!hasDatabase())
+    if (!hasDatabaseDirectory())
     {
-        throw std::runtime_error("Database not set");
+        throw std::runtime_error("Database directory not set");
     }
-    return pImpl->mDatabase;
+    return pImpl->mDatabaseDirectory;
 }
 
-bool RocksDatabaseOptions::hasDatabase() const noexcept
+bool RocksDatabaseOptions::hasDatabaseDirectory() const noexcept
 {
-    return !pImpl->mDatabase.empty();
+    return !pImpl->mDatabaseDirectory.empty();
 }
 
 /// Overwrite if exists
-void RocksDatabaseOptions::enableOverwWriteIfExists() noexcept
+void RocksDatabaseOptions::enableOverWriteIfExists() noexcept
 {
-    pImpl->mOverwriteIfExists = true;
+    pImpl->mOverWriteIfExists = true;
 }
 
-void RocksDatabaseOptions::disableOverwWiteIfExists() noexcept
+void RocksDatabaseOptions::disableOverWriteIfExists() noexcept
 {
-    pImpl->mOverwriteIfExists = false;
+    pImpl->mOverWriteIfExists = false;
 }
 
 bool RocksDatabaseOptions::overWriteIfExists() const noexcept
 {
-    return pImpl->mOverwriteIfExists;
+    return pImpl->mOverWriteIfExists;
 }
 
 /// Retention
@@ -113,18 +114,36 @@ std::chrono::seconds RocksDatabaseOptions::getRetention() const noexcept
 }
 
 /// Write buffer size
-void RocksDatabaseOptions::setWriteBufferSize(const size_t writeBufferSize)
+void RocksDatabaseOptions::setWriteBufferSizeInBytes(
+    const size_t writeBufferSizeInBytes)
 {
-    if (writeBufferSize == 0)
+    if (writeBufferSizeInBytes == 0)
     {
         throw std::invalid_argument("Write buffer size must be positive");
     }
-    pImpl->mWriteBufferSize = writeBufferSize;
+    pImpl->mWriteBufferSizeInBytes = writeBufferSizeInBytes;
 }
 
-size_t RocksDatabaseOptions::getWriteBufferSize() const noexcept
+size_t RocksDatabaseOptions::getWriteBufferSizeInBytes() const noexcept
 {
-    return pImpl->mWriteBufferSize;
+    return pImpl->mWriteBufferSizeInBytes;
+}
+
+/// Maximum number of memory tables
+void RocksDatabaseOptions::setMaximumNumberOfMemoryTables(
+    const int maximumNumberOfMemoryTables)
+{
+    if (maximumNumberOfMemoryTables < 1)
+    {
+        throw std::invalid_argument(
+            "Maximum number of memory tables must be positive");
+    }
+    pImpl->mMaximumNumberOfMemoryTables = maximumNumberOfMemoryTables;
+}
+
+int RocksDatabaseOptions::getMaximumNumberOfMemoryTables() const noexcept
+{
+    return pImpl->mMaximumNumberOfMemoryTables;
 }
 
 /// Write-ahead-log

@@ -28,6 +28,10 @@ public:
     /// @brief Number of invalid packets received.
     void incrementNumberOfInvalidPacketsReceived() noexcept;
     /// @result The number of invalid packets received.
+    [[nodiscard]] int64_t getNumberOfInvalidPacketsReceived() const noexcept;
+
+    /// @result The number of packets successfully added to the
+    ///         import queue (i.e., the valid packets).
     [[nodiscard]] int64_t getNumberOfPacketsAddedToImportQueue() const noexcept;
 
     /// @brief Increments the number of packets added to the import queue.

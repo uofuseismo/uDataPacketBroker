@@ -32,7 +32,8 @@ public:
     void start();
 
     /// @brief Management routine to check the running threads in the broker.
-    [[nodiscard]] bool checkFutures(const std::chrono::milliseconds &timeOut = std::chrono::milliseconds {10}) const noexcept;
+    /// @result True indicates all the futures are okay.
+    [[nodiscard]] bool checkFuturesOkay(const std::chrono::milliseconds &timeOut) const;
 
     /// @brief Stops the broker.
     void stop();

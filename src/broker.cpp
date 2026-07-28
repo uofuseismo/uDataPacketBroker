@@ -9,9 +9,10 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-#include <utility>
+#include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h> //NOLINT
@@ -27,7 +28,7 @@
 
 using namespace UDataPacketBroker;
 
-class BrokerImpl
+class Broker::BrokerImpl
 {
 public:
     BrokerImpl(const BrokerOptions &options,
@@ -87,14 +88,42 @@ public:
     /// Starts the threads. 
     void start()
     {
-        mKeepRunning.store(true);
+        mKeepRunning.store(true, std::memory_order_seq_cst);
         // Start the packet propagator
- 
+        auto propagatorFuture
+            = std::async(std::launch::async,
+                         &BrokerImpl::propagatePacket, this);
+        mFuturesMap.insert_or_assign("PacketPropagatorThread", std::move(propagatorFuture)); 
         // Start publishing data
 
         // Start receiving data 
-         
     }
+
+    /// @result True indicates the processes are doing alright.
+    bool checkFuturesOkay(const std::chrono::milliseconds &timeOut) const
+    {
+        bool isOkay{false};
+        for (auto &futurePair : mFuturesMap)
+        {
+            try
+            {
+                auto status = futurePair.second.wait_for(timeOut);
+                if (status == std::future_status::ready)
+                {
+                    futurePair.second.get();
+                }
+            }
+            catch (const std::exception &e)
+            {
+                SPDLOG_LOGGER_CRITICAL(mLogger,
+                                       "Fatal error detected in {} ({})", 
+                                       futurePair.first, 
+                                       e.what());
+                isOkay = false;
+            }
+        }
+        return isOkay;
+    } 
 
     /// @brief Landing spot for the publish service to send received packets.
     /// @note We clobber the input sequence number here in a mutex so that
@@ -147,6 +176,10 @@ public:
     ///         Publish Queue     Database Queue
     void propagatePacket()
     {
+// TODO these are options
+        size_t mMaximumDataStoreQueueSize{4096};
+        size_t mMaximumPublishQueueStoreSize{4096}; 
+
         while (mKeepRunning.load())
         {
             // Check for new packet
@@ -163,22 +196,46 @@ public:
             }
             if (gotPacket)
             {
-                // New packet received - update sequence number and ship it off
+                // Tag the time - it actually doesn't need to be super exact
+                // because this is really for the benefit of compaction.
+                auto now = Utilities::getNow<std::chrono::nanoseconds> ();
+                int nPoppedFromPublishQueue{0};
+                int nPoppedFromDataStoreQueue{0};
+                //Update sequence number of packet
                 mGlobalSequenceNumber = mGlobalSequenceNumber + 1;
                 packet.set_sequence_number(mGlobalSequenceNumber);
+
+                // Enqueue for publication
                 {
                 std::lock_guard<std::mutex> lock(mPublishMutex);
+                // Pop the queue if it's overfull - writer thread is probably
+                // stuck
+                while (mPublishQueue.size() >= mMaximumPublishQueueStoreSize)
+                {
+                    mPublishQueue.pop();
+                    nPoppedFromPublishQueue = nPoppedFromPublishQueue + 1;
+                }  
+                // Okay publish it
                 mPublishQueue.push(packet);
-                // Can handle max sizing here too
-
                 } 
+
+                // Enqueue for write to datastore
                 {
                 std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
                 // N.B. This is a slight optimization since I'm done with
                 // the packet.
-                mDataPacketStoreQueue.push(std::move(packet));
-                // Can handle max sizing here too
-
+                auto receiptTimeAndPacket
+                    = std::make_pair(now, std::move(packet));
+                // Pop the queue if it's overfull - writer thread is probably
+                // stuck
+                while (mDataPacketStoreQueue.size() >=
+                       mMaximumDataStoreQueueSize)
+                {
+                    mDataPacketStoreQueue.pop();
+                    nPoppedFromDataStoreQueue = nPoppedFromDataStoreQueue + 1;
+                }
+                // Okay push the queue
+                mDataPacketStoreQueue.push(std::move(receiptTimeAndPacket));
                 }
             }
             else
@@ -236,24 +293,42 @@ public:
     /// @note Because there's queues between the initial thread receiving
     ///       the packet, it propagating to this function, this function
     ///       batch writing the data there's a gap where I can lose data.
-    void writePacketsToDatabase()
+    void writePacketsToDataStore()
     {
         while (mKeepRunning.load())
         {
             bool gotPacket{false};
             // Have the option to be kinda smart here.  If there's
             // a few packets then I can write them all at once.
+            std::vector
+            <
+                std::pair
+                <
+                    std::chrono::nanoseconds,
+                    UDataPacketBrokerAPI::V1::Packet
+                >
+            > receiptTimesAndData;
             {
             std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
-         
+            while (!mDataPacketStoreQueue.empty())
+            {
+/*
+                auto packet = std::move(mDataPacketStoreQueue.front());
+                mDataPacketStoreQueue.pop();
+                auto receiptTimeAndData = std::make_pair(now, std::move(packet));
+                receiptTimesAndData.push_back(std::move(receiptTimeAndData));
+*/
+            }
             } 
+            // Write it
+  
             // Try again on failed writes. 
 
             // No data?  Okay, take a nap.
             constexpr std::chrono::milliseconds timeOut{10};
             std::this_thread::sleep_for(timeOut);
         } 
-        SPDLOG_LOGGER_DEBUG(mLogger, "Exiting database writer loop");
+        SPDLOG_LOGGER_DEBUG(mLogger, "Exiting data store writer loop");
     }
 
     /// @brief Stops the broker.
@@ -272,6 +347,23 @@ public:
 
         // Hopefully by now everything has been sent - end subscriber service.
 
+        // Persist anything still buffered in memory.  The write-ahead-log is
+        // disabled by default, so without this a graceful shutdown would lose
+        // the packets sitting in the memtable.
+        // NOTE: once the database writer thread drains mDataPacketStoreQueue
+        // and is joined here, this flush must run *after* that final drain.
+        if (mDataPacketStore)
+        {
+            SPDLOG_LOGGER_DEBUG(mLogger, "Flushing data packet store");
+            mDataPacketStore->flush();
+        }
+
+        // Get futures
+        for (auto &futurePair : mFuturesMap)
+        {
+            SPDLOG_LOGGER_DEBUG(mLogger, "Getting future {}", futurePair.first);
+            futurePair.second.get();
+        }
     }
 //private:
     BrokerOptions mOptions;
@@ -293,10 +385,37 @@ public:
         UDataPacketBroker::MetricsSingleton::getInstance()
     };  
     std::queue<UDataPacketBrokerAPI::V1::Packet> mImportQueue;
-    std::queue<UDataPacketBrokerAPI::V1::Packet> mDataPacketStoreQueue;
+    std::queue
+    <
+        std::pair
+        <
+            std::chrono::nanoseconds,
+            UDataPacketBrokerAPI::V1::Packet
+        >
+    > mDataPacketStoreQueue;
     std::queue<UDataPacketBrokerAPI::V1::Packet> mPublishQueue;
-    std::map<std::string, std::future<void>> mFuturesMap;
+    mutable std::map<std::string, std::future<void>> mFuturesMap;
     uint64_t mGlobalSequenceNumber{0};
     size_t mMaximumImportQueueSize{8192};
     std::atomic<bool> mKeepRunning{true};
 };
+
+/// Constructor
+Broker::Broker(const BrokerOptions &options,
+           std::shared_ptr<IDataPacketStore> store,
+           std::shared_ptr<spdlog::logger> logger) :
+    pImpl(std::make_unique<BrokerImpl> (options,
+                                        std::move(store),
+                                        std::move(logger)))
+{
+}
+
+/// Destructor
+Broker::~Broker() = default;
+
+/// Futures okay?
+bool Broker::checkFuturesOkay(const std::chrono::milliseconds &waitFor) const
+{
+    return pImpl->checkFuturesOkay(waitFor);
+}
+
