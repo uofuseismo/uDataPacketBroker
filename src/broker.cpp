@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstddef>
 #include <exception>
@@ -8,11 +10,13 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 #include <spdlog/spdlog.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/stdout_color_sinks.h> //NOLINT
@@ -89,11 +93,24 @@ public:
     void start()
     {
         mKeepRunning.store(true, std::memory_order_seq_cst);
+        // Start the compactor thread
+        auto compactorFuture
+            = std::async(std::launch::async,
+                         &BrokerImpl::compactDataStore, this);
+        mFuturesMap.insert_or_assign(
+            "DataStoreCompactorThread", std::move(compactorFuture));
+        // Start the truncator thread
+        auto truncatorFuture
+            = std::async(std::launch::async,
+                         &BrokerImpl::truncateDataStore, this);
+        mFuturesMap.insert_or_assign(
+            "DataStoreTruncatorThread", std::move(truncatorFuture));
         // Start the packet propagator
         auto propagatorFuture
             = std::async(std::launch::async,
                          &BrokerImpl::propagatePacket, this);
-        mFuturesMap.insert_or_assign("PacketPropagatorThread", std::move(propagatorFuture)); 
+        mFuturesMap.insert_or_assign(
+            "PacketPropagatorThread", std::move(propagatorFuture)); 
         // Start publishing data
 
         // Start receiving data 
@@ -125,6 +142,73 @@ public:
         return isOkay;
     } 
 
+    /// @brief Compacts data - i.e., drops data older than a certain time
+    void compactDataStore()
+    {
+        auto interval = mOptions.getCompactionInterval();
+        const std::chrono::nanoseconds
+            retentionDuration{mOptions.getRetentionDuration()};
+        while (mKeepRunning.load())
+        {
+            auto dropBefore
+                = Utilities::getNow<std::chrono::nanoseconds> ()
+                - retentionDuration;
+            mDataPacketStore->compact(dropBefore);
+            // Back to sleep
+            std::unique_lock<std::mutex> lock(mShutdownMutex);
+            mShutdownCondition.wait_for(lock, interval,
+                                        [this]
+                                        {
+                                           return mShutdownRequested;
+                                        }); 
+            if (mShutdownRequested){break;}
+        }
+        SPDLOG_LOGGER_DEBUG(mLogger, "Exiting compaction loop");
+    }
+
+    /// @brief This is the safety valve for when we're getting crushed.
+    void truncateDataStore()    
+    {
+        auto desiredSizeInBytes
+            = mOptions.getDesiredMaximumDataStoreSizeInBytes();
+        auto chunkSize = mOptions.getTruncationChunkSize();
+        constexpr std::chrono::milliseconds minimumInterval{10};
+        const std::chrono::milliseconds
+            initialInterval{mOptions.getTruncationBaseInterval()};
+        auto currentInterval = initialInterval;
+        while (mKeepRunning.load())
+        {
+            if (desiredSizeInBytes != std::nullopt)
+            {
+                int nTotalTruncated{0};
+                while (mDataPacketStore->getSizeInBytes() > *desiredSizeInBytes)
+                {
+                    auto nTruncated = mDataPacketStore->truncateOldest(chunkSize);
+                    if (nTruncated == 0){break;}
+                    nTotalTruncated = nTotalTruncated + nTruncated;
+                }
+                // Note, shrink the interval it in metrics and logs
+                if (nTotalTruncated > 0)
+                {
+                    currentInterval = std::max(minimumInterval, currentInterval/2);
+                }
+                else
+                {
+                    currentInterval = std::min(initialInterval, currentInterval*2);
+                }
+            }
+            // Sleep
+            // Back to sleep
+            std::unique_lock<std::mutex> lock(mShutdownMutex);
+            mShutdownCondition.wait_for(lock, currentInterval,
+                                        [this]
+                                        {
+                                           return mShutdownRequested;
+                                        });
+            if (mShutdownRequested){break;}
+        }
+    }
+
     /// @brief Landing spot for the publish service to send received packets.
     /// @note We clobber the input sequence number here in a mutex so that
     ///       it is ready for all downstream customers.
@@ -142,7 +226,7 @@ public:
         // Okay, get it in the queue.
         int nPopped{0};
         {
-        std::lock_guard<std::mutex> lock(mImportMutex);
+        const std::lock_guard<std::mutex> lock(mImportMutex);
         // Space available?
         if (mImportQueue.size() > mMaximumImportQueueSize)
         {
@@ -186,7 +270,7 @@ public:
             bool gotPacket{false};
             UDataPacketBrokerAPI::V1::Packet packet;
             {
-            std::lock_guard<std::mutex> lock(mImportMutex);
+            const std::lock_guard<std::mutex> lock(mImportMutex);
             if (!mImportQueue.empty())
             {
                 packet = std::move(mImportQueue.front());
@@ -207,7 +291,7 @@ public:
 
                 // Enqueue for publication
                 {
-                std::lock_guard<std::mutex> lock(mPublishMutex);
+                const std::lock_guard<std::mutex> lock(mPublishMutex);
                 // Pop the queue if it's overfull - writer thread is probably
                 // stuck
                 while (mPublishQueue.size() >= mMaximumPublishQueueStoreSize)
@@ -221,7 +305,7 @@ public:
 
                 // Enqueue for write to datastore
                 {
-                std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
+                const std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
                 // N.B. This is a slight optimization since I'm done with
                 // the packet.
                 auto receiptTimeAndPacket
@@ -257,7 +341,7 @@ public:
             bool gotPacket{false};
             UDataPacketBrokerAPI::V1::Packet packet;
             {
-            std::lock_guard<std::mutex> lock(mPublishMutex);
+            const std::lock_guard<std::mutex> lock(mPublishMutex);
             if (!mPublishQueue.empty())
             { 
                 packet = std::move(mPublishQueue.front());
@@ -297,7 +381,7 @@ public:
     {
         while (mKeepRunning.load())
         {
-            bool gotPacket{false};
+            //bool gotPacket{false};
             // Have the option to be kinda smart here.  If there's
             // a few packets then I can write them all at once.
             std::vector
@@ -309,7 +393,7 @@ public:
                 >
             > receiptTimesAndData;
             {
-            std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
+            const std::lock_guard<std::mutex> lock(mDataPacketStoreMutex);
             while (!mDataPacketStoreQueue.empty())
             {
 /*
@@ -344,6 +428,10 @@ public:
         // Stop propagating data.
         SPDLOG_LOGGER_DEBUG(mLogger, "Stopping broker processes");
         mKeepRunning.store(false, std::memory_order_seq_cst);
+        // Try to kill the threads that sleep until they have to do something
+        mShutdownRequested = true;
+        mShutdownCondition.notify_all();
+        std::this_thread::sleep_for(std::chrono::milliseconds {10});
 
         // Hopefully by now everything has been sent - end subscriber service.
 
@@ -372,6 +460,7 @@ public:
     std::mutex mImportMutex;
     std::mutex mDataPacketStoreMutex;
     std::mutex mPublishMutex;
+    std::mutex mShutdownMutex;
     std::unique_ptr<PublishService> mPublishService{nullptr};
     //std::shared_ptr<SubscriptionManager> mSubscriptionManager{nullptr};
     std::function<void(UDataPacketBrokerAPI::V1::Packet &&)>
@@ -397,7 +486,9 @@ public:
     mutable std::map<std::string, std::future<void>> mFuturesMap;
     uint64_t mGlobalSequenceNumber{0};
     size_t mMaximumImportQueueSize{8192};
+    std::condition_variable mShutdownCondition;
     std::atomic<bool> mKeepRunning{true};
+    bool mShutdownRequested{false};
 };
 
 /// Constructor

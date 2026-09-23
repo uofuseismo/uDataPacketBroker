@@ -1,5 +1,7 @@
 #include <chrono>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <stdexcept>
 #include "uDataPacketBroker/brokerOptions.hpp"
@@ -14,7 +16,11 @@ class BrokerOptions::BrokerOptionsImpl
 public:
     PublishServiceOptions mPublishServiceOptions;
     //SubscribeServiceOptions mSubscribeServiceOptions;
-    //std::chrono::milliseconds mPickRetention{std::chrono::minutes {30}};
+    std::chrono::seconds mRetentionDuration{std::chrono::minutes {30}};
+    std::chrono::seconds mCompactionInterval{std::chrono::seconds {30}};
+    std::chrono::seconds mTruncationBaseInterval{std::chrono::seconds {30}};
+    std::optional<size_t> mDesiredMaximumDataStoreSizeInBytes{std::nullopt};
+    int mTruncationChunkSize{128}; // In packets
     int mQueueCapacity{8192};
     bool mHasPublishServiceOptions{false};
     bool mHasSubscribeServiceOptions{false};
@@ -90,6 +96,57 @@ PublishServiceOptions BrokerOptions::getPublishServiceOptions() const
 bool BrokerOptions::hasPublishServiceOptions() const noexcept
 {
     return pImpl->mHasPublishServiceOptions;
+}
+
+/// Retention duration 
+void BrokerOptions::setRetentionDuration(
+    const std::chrono::seconds &duration)
+{
+    if (duration.count() < 1)
+    {
+        throw std::invalid_argument("The retention duration must be positive");
+    }
+    pImpl->mRetentionDuration = duration;
+}
+
+std::chrono::seconds BrokerOptions::getRetentionDuration() const noexcept
+{
+    return pImpl->mRetentionDuration;
+}
+
+/// Compaction interval
+void BrokerOptions::setCompactionInterval(
+    const std::chrono::seconds &interval)
+{
+    if (interval.count() < 0)
+    {
+        throw std::invalid_argument("Compaction interval must be non-negative");
+    }
+    pImpl->mCompactionInterval = interval;
+}
+
+std::chrono::seconds BrokerOptions::getCompactionInterval() const noexcept
+{
+    return pImpl->mCompactionInterval;
+}
+
+/// Max desired database size
+std::optional<std::size_t> 
+    BrokerOptions::getDesiredMaximumDataStoreSizeInBytes() const noexcept
+{
+    return pImpl->mDesiredMaximumDataStoreSizeInBytes;
+}
+
+/// Truncation chunk size
+int BrokerOptions::getTruncationChunkSize() const noexcept
+{
+    return pImpl->mTruncationChunkSize;
+}
+
+/// Base interval for truncation
+std::chrono::seconds BrokerOptions::getTruncationBaseInterval() const noexcept
+{
+    return pImpl->mTruncationBaseInterval;
 }
 
 /// Subscribe service options

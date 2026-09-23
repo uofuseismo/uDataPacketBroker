@@ -1,5 +1,5 @@
-#ifndef UDATA_PACKET_BROKER_HPP
-#define UDATA_PACKET_BROKER_HPP
+#ifndef UDATA_PACKET_BROKER_VERSION_HPP
+#define UDATA_PACKET_BROKER_VERSION_HPP
 #include <string>
 #define uDataPacketBroker_MAJOR  @uDataPacketBroker_VERSION_MAJOR@
 #define uDataPacketBroker_MINOR  @uDataPacketBroker_VERSION_MINOR@
